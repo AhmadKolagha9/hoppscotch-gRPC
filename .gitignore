@@ -83,6 +83,9 @@ web_modules/
 # dotenv environment variable files
 .env
 .env.*
+# ...except the checked-in template (no real secrets, needed at build time
+# by @import-meta-env's Vite plugin for hoppscotch-sh-admin/selfhost-web)
+!.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
