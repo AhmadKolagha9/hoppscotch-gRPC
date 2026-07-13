@@ -2,27 +2,21 @@
 # This stage is used to build both Caddy and the webapp server,
 # preventing vulnerable packages on the dependency chain
 FROM alpine:3.24.1 AS go_builder
-RUN apk add --no-cache curl git openssh-client
+# Installed via Alpine's own apk repository rather than downloading a tarball
+# from go.dev directly: a build on one network got a hard 404 on every
+# go.dev/dl/* URL tried (across multiple Go versions), while Alpine's own
+# package mirrors (already reachable there via other apk installs in this
+# Dockerfile) were unaffected — consistent with go.dev itself being
+# blocked/filtered on that network rather than a propagation gap in one
+# release. apk's repository index is already signature-verified, so no
+# separate checksum step is needed here. Alpine 3.24 ships go 1.26.3,
+# comfortably above the 1.25.1/1.24.0 minimums webapp-server and Caddy
+# (v2.11.4) require. The apk package installs to /usr/bin/go, already on
+# the default PATH, so no PATH override is needed either.
+RUN apk add --no-cache curl git openssh-client go
 
-ARG TARGETARCH
-ENV GOLANG_VERSION=1.26.4
-# Download Go tarball
-RUN case "${TARGETARCH}" in amd64) GOARCH=amd64 ;; arm64) GOARCH=arm64 ;; *) echo "Unsupported arch: ${TARGETARCH}" && exit 1 ;; esac && \
-  curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "https://go.dev/dl/go${GOLANG_VERSION}.linux-${GOARCH}.tar.gz" -o go.tar.gz
-# Checksum verification of Go tarball
-RUN case "${TARGETARCH}" in \
-  amd64) expected="1153d3d50e0ac764b447adfe05c2bcf08e889d42a02e0fe0259bd47f6733ad7f" ;; \
-  arm64) expected="ef758ae7c6cf9267c9c0ef080b8965f453d89ab2d25d9eb22de4405925238768" ;; \
-  esac && \
-  actual=$(sha256sum go.tar.gz | cut -d' ' -f1) && \
-  [ "$actual" = "$expected" ] && \
-  echo "✅ Go Tarball Checksum OK" || \
-  (echo "❌ Go Tarball Checksum failed! Expected: ${expected} Got: ${actual}" && exit 1)
-# Install Go from verified tarball
-RUN tar -C /usr/local -xzf go.tar.gz && rm go.tar.gz
 # Set up Go environment variables
-ENV PATH="/usr/local/go/bin:${PATH}" \
-  GOPATH="/go" \
+ENV GOPATH="/go" \
   GOBIN="/go/bin"
 
 
